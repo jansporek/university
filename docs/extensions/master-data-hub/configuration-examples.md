@@ -68,7 +68,6 @@ Compound queries are very useful when we need to match against multiple attribut
   "aggregate": [
     {
       "$search": {
-        "index": "default",
         "compound": {
           "must": [
             {
@@ -223,7 +222,6 @@ It is necessary to restrict the fuzzy search results by using `$match` on the re
   "aggregate": [
     {
       "$search": {
-        "index": "default",
         "text": {
           "query": "{item_description} ", // notice the extra space at the end!
           "path": "description"
@@ -250,6 +248,83 @@ It is necessary to restrict the fuzzy search results by using `$match` on the re
   ]
 }
 ```
+
+## Compound fuzzy matching with filtering
+
+It's possible to first filter records before fuzzy searching among them. This compound (in other words composite command combining multiple queries) query first filters all records with the provided IBAN before fuzzy searching for sender name.
+
+```json
+{
+  "aggregate": [
+    {
+      "$search": {
+        "index": "search_vendor",
+        "compound": {
+          "filter": [
+            {
+              "phrase": {
+                "path": [
+                  "IBAN"
+                ],
+                "query": [
+                  "{iban}"
+                ]
+              }
+            }
+          ],
+          "must": [
+            {
+              "text": {
+                "path": [
+                  "Name"
+                ],
+                "fuzzy": {
+                  "maxEdits": 1
+                },
+                "query": [
+                  "{sender_name}"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "$limit": 10 // optional but highly recommended for performance reasons, optimal limit is around 50, no more
+    }
+  ]
+}
+```
+
+## Expanding an array
+
+Unwind an array of subdocuments into individual records while preserving all information from the parent.
+
+```json
+{
+    "aggregate": [
+        {
+            "$match": {
+                "entity.internalId": "{vendor_ns}",
+                "internalId": "{purchase_order_ns}"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$itemList.item",
+                "preserveNullAndEmptyArrays": true
+            }
+        },
+        {
+            "$match": {
+                "itemList.item.amount": "{item_total_base}"
+            }
+        }
+    ]
+}
+```
+
 
 ## HTTP requests
 
